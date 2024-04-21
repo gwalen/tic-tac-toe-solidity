@@ -6,14 +6,24 @@ contract TicTacToe {
     uint8 constant O_SIGN = 1;
     uint8 constant X_SIGN = 2;
 
-    enum GameState { Uninitialized, InviteSent, InProgress, Player1Win, Player2Win, Draw }
+    // Enum representing the various states of a game. Each game init state when not created is equal 'Uninitialized' state 
+    // which is default default value (0) for the enum.
+    enum GameState {
+        Uninitialized,  // Default state for newly declared games, used to verify whether a game is initialized
+        InviteSent,     // State indicates that an invite has been sent to another player - game is open
+        InProgress,     // State during which the game is actively being played - game has started 
+        Player1Win,     // Designated win state for player 1
+        Player2Win,     // Designated win state for player 2
+        Draw            // State indicating the game has ended in a draw
+    }
 
     struct Game {
         address player1;  // game initiator
         address player2;  // invitee
         uint8 player1Sign;
         uint8 player2Sign;
-        uint8[3][3] board;  // TODO: optimize
+        // 0 means that board field is empty
+        uint8[3][3] board;
         address currentPlayer;
         GameState state;
     }
@@ -118,8 +128,17 @@ contract TicTacToe {
         emit MoveMade(gameId, msg.sender, x, y);
     }
 
-    function getGameStatus(uint256 gameId) public view returns (GameState) {
+    function getGameState(uint256 gameId) public view returns (GameState) {
         return games[gameId].state;
+    }
+
+    function getGameData(uint256 gameId) 
+        public 
+        view 
+        returns (address, address, uint8, uint8, uint8[3][3] memory, address, GameState) 
+    {
+        Game memory game = games[gameId];
+        return (game.player1, game.player2, game.player1Sign, game.player2Sign, game.board, game.currentPlayer, game.state);
     }
 
     function checkWinner(uint256 gameId, uint8 playerSign) internal view returns (bool) {
