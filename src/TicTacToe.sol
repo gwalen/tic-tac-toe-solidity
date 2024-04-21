@@ -21,14 +21,10 @@ contract TicTacToe {
     mapping(uint256 => Game) public games;
     uint256 private gameIdCounter = 1;
 
-    // mapping(uint256 => uint256) public openGames;
-    mapping(uint256 => uint256) public openInvitations;
-
     event GameCreated(uint256 gameId, address creator, address invitee);
     event GameStarted(uint256 gameId, address player1, address player2);
     event MoveMade(uint256 gameId, address player, uint8 x, uint8 y);
     event GameEnded(uint256 gameId, GameState result);
-
 
     error InvalidPosition();
     error NotAParticipant();
@@ -46,17 +42,10 @@ contract TicTacToe {
     }
 
     modifier isPlayer(uint256 gameId, address player) {
-        // require(games[gameId].player1 == player || games[gameId].player2 == player, "Not a participant in this game");
         if(games[gameId].player1 != player && games[gameId].player2 != player) {
             revert NotAParticipant();
         }
         _;
-    }
-
-    function generateHashKey(address addr1, address addr2) internal pure returns (uint256) {
-        return uint256(keccak256(
-            addr1 > addr2 ? abi.encodePacked(addr1, addr2) : abi.encodePacked(addr2, addr1)
-        ));
     }
 
     function createGame(address invitee) public returns(uint256) {
@@ -64,11 +53,7 @@ contract TicTacToe {
             revert CanNotInviteYourself();
         }
 
-        // uint256 hashedKey = generateHashKey(msg.sender, invitee);
         uint256 newGameId = gameIdCounter++;
-        // there can be many invitations (game open) even to between the same players
-        openInvitations[newGameId] = newGameId;
-        
         Game storage newGame = games[newGameId];
         newGame.player1 = msg.sender;
         newGame.player2 = invitee;
@@ -78,25 +63,15 @@ contract TicTacToe {
         return newGameId;
     }
 
-    // TODO: missing check if there is already an started game between players (check open games mapping)
     function joinGame(uint256 gameId) public {
-        // Invitation already used (game started) or never existed
-        // require(games[gameId].state == GameState.InviteSent, "Wrong state for new game");
         if (games[gameId].state != GameState.InviteSent) {
             revert NoInvitationFoundOrWrongGameId();
         }
-        // require(msg.sender == games[gameId].player2, "Player not is not an invitee");
         if (msg.sender != games[gameId].player2) {
             revert NotAParticipant();
         }
 
-        // address player1 = games[gameId].player1;
-        // address player2 = games[gameId].player2;
-        // uint256 hashedKey = generateHashKey(player1, player2);
-        // require(openInvitations[hashedKey] == gameId, "No invitation found or wrong game ID");
-
         Game storage game = games[gameId];
-        // game.gameStarted = true;
         game.state = GameState.InProgress;
         // Determine roles and set first move
         bytes32 hash = keccak256(abi.encodePacked(game.player1, game.player2));
@@ -112,22 +87,17 @@ contract TicTacToe {
         
         } 
 
-        // invitation accepted, new invitations can be sent now
-        // openInvitations[hashedKey] = 0; 
         emit GameStarted(gameId, game.player1, game.player2);
     }
 
     function makeMove(uint256 gameId, uint8 x, uint8 y) public isValidPosition(x, y) isPlayer(gameId, msg.sender) {
         Game storage game = games[gameId];
-        // require(game.state == GameState.InProgress, "Game is not in progress");
         if (game.state != GameState.InProgress) {
             revert GameNotInProgress();
         }
-        // require(game.currentPlayer == msg.sender, "It's not your turn");
         if (game.currentPlayer != msg.sender) {
             revert NotYourTurn();
         }
-        // require(game.board[x][y] == 0, "Cell already occupied");
         if(game.board[x][y] != 0) {
             revert CellOccupied();
         }
@@ -151,11 +121,6 @@ contract TicTacToe {
     function getGameStatus(uint256 gameId) public view returns (GameState) {
         return games[gameId].state;
     }
-
-    // function checkInvitation(address player1, address player2) public view returns (bool) {
-    //     uint256 hashedKey = generateHashKey(player1, player2);
-    //     return openInvitations[hashedKey] != 0;
-    // }
 
     function checkWinner(uint256 gameId, uint8 playerSign) internal view returns (bool) {
         uint8[3][3] memory board = games[gameId].board;
