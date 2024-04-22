@@ -13,8 +13,7 @@ To test:
 foundry test
 ```
 
-### Possible improvements:
+### Performed optimizations
 
-Use bits to represent the board instead of arrays of uint8.
-
-This would reduce the storage usage.
+My first implementation was done using multidimensional array `uint8[3][3]` but I moved it into the single `uint256` with cell
+represented as bits in the continuous array. 

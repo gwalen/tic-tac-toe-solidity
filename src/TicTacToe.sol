@@ -6,7 +6,7 @@ contract TicTacToe {
     uint8 constant O_SIGN = 1;
     uint8 constant X_SIGN = 2;
 
-    // Enum representing the various states of a game. Each game init state when not created is equal 'Uninitialized' state 
+    // Enum representing the various states of a game. Each game init state when not created is equal Uninitialized state 
     // which is default default value (0) for the enum.
     enum GameState {
         Uninitialized,  // Default state for newly declared games, used to verify whether a game is initialized
@@ -18,12 +18,11 @@ contract TicTacToe {
     }
 
     struct Game {
-        address player1;  // game initiator
-        address player2;  // invitee
+        address player1; // game initiator
+        address player2; // invitee 
         uint8 player1Sign;
         uint8 player2Sign;
-        // 0 means that board field is empty
-        uint8[3][3] board;
+        uint256 board;  // Optimized board representation
         address currentPlayer;
         GameState state;
     }
@@ -43,6 +42,7 @@ contract TicTacToe {
     error CellOccupied();
     error NoInvitationFoundOrWrongGameId();
     error CanNotInviteYourself();
+    error InvalidCellValue();
 
     modifier isValidPosition(uint8 x, uint8 y) {
         if (x >= 3 || y >= 3) {
@@ -58,7 +58,7 @@ contract TicTacToe {
         _;
     }
 
-    function createGame(address invitee) public returns(uint256) {
+    function openGame(address invitee) public returns(uint256) {
         if(invitee == msg.sender) {
             revert CanNotInviteYourself();
         }
@@ -67,6 +67,7 @@ contract TicTacToe {
         Game storage newGame = games[newGameId];
         newGame.player1 = msg.sender;
         newGame.player2 = invitee;
+        newGame.board = 0;  // Initialize the board with 0
         newGame.state = GameState.InviteSent;
 
         emit GameCreated(newGameId, msg.sender, invitee);
@@ -108,14 +109,14 @@ contract TicTacToe {
         if (game.currentPlayer != msg.sender) {
             revert NotYourTurn();
         }
-        if(game.board[x][y] != 0) {
+        if(getCell(game.board, x, y) != 0) {
             revert CellOccupied();
         }
 
         uint8 currentPlayerSign = (game.currentPlayer == game.player1) ? game.player1Sign : game.player2Sign;
-        game.board[x][y] = currentPlayerSign;
+        setCell(gameId, x, y, currentPlayerSign);
 
-        if (checkWinner(gameId, currentPlayerSign)) {
+        if (checkWinner(games[gameId].board, currentPlayerSign)) {
             game.state = currentPlayerSign == game.player1Sign ? GameState.Player1Win : GameState.Player2Win;
             emit GameEnded(gameId, game.state);
         } else if (isDraw(game.board)) {
@@ -135,36 +136,69 @@ contract TicTacToe {
     function getGameData(uint256 gameId) 
         public 
         view 
-        returns (address, address, uint8, uint8, uint8[3][3] memory, address, GameState) 
+        returns (address, address, uint8, uint8, uint256, address, GameState) 
     {
         Game memory game = games[gameId];
         return (game.player1, game.player2, game.player1Sign, game.player2Sign, game.board, game.currentPlayer, game.state);
     }
 
-    function checkWinner(uint256 gameId, uint8 playerSign) internal view returns (bool) {
-        uint8[3][3] memory board = games[gameId].board;
-        for (uint i = 0; i < 3; i++) {
-            if (board[i][0] == playerSign && board[i][1] == playerSign && board[i][2] == playerSign || 
-                board[0][i] == playerSign && board[1][i] == playerSign && board[2][i] == playerSign) {
+    function checkWinner(uint256 board, uint8 playerSign) internal view returns (bool) {
+        // Check rows and columns
+        for (uint8 i = 0; i < 3; i++) {
+            if (getCell(board, i, 0) == playerSign && getCell(board, i, 1) == playerSign && getCell(board, i, 2) == playerSign ||
+                getCell(board, 0, i) == playerSign && getCell(board, 1, i) == playerSign && getCell(board, 2, i) == playerSign) {
                 return true;
             }
         }
-        if (board[0][0] == playerSign && board[1][1] == playerSign && board[2][2] == playerSign ||
-            board[0][2] == playerSign && board[1][1] == playerSign && board[2][0] == playerSign) {
+        // Check diagonals
+        if (getCell(board, 0, 0) == playerSign && getCell(board, 1, 1) == playerSign && getCell(board, 2, 2) == playerSign ||
+            getCell(board, 0, 2) == playerSign && getCell(board, 1, 1) == playerSign && getCell(board, 2, 0) == playerSign) {
             return true;
         }
         return false;
     }
 
     // all fields need to used and no one was selected as a winner
-    function isDraw(uint8[3][3] memory board) internal pure returns (bool) {
+    function isDraw(uint256 board) internal view returns (bool) {
         for (uint8 i = 0; i < 3; i++) {
             for (uint8 j = 0; j < 3; j++) {
-                if (board[i][j] == 0) {
+                if (getCell(board, i, j) == 0) {
                     return false;
                 }
             }
         }
         return true;
+    }
+
+
+    /// Method sets the value of cell on the board represented as a bit array
+    ///
+    /// Explanation:
+    /// The tic-tac-toe board is a 3x3 grid. We can think of it as a linear array of length 9 (since 3 rows * 3 columns = 9 cells).
+    /// Each cell in this linearized version of the board can be indexed from 0 to 8.
+    ///
+    /// Each cell on the tic-tac-toe board can take on one of three values (0, 1, or 2), so we need 2 bits to represent the cell state.
+    /// The position of the cell in the linear array is calculated by taking the index and multiplying it by 2 to allocate 2 bits per cell.
+    /// Thus, (x * 3 + y) * 2 computes the starting bit position for the cell at coordinates (x, y)
+    function setCell(uint256 gameId, uint8 x, uint8 y, uint8 value) internal {
+        uint256 board = games[gameId].board;
+        if(value > 2) {
+            revert InvalidCellValue();
+        }
+        // Calculate the bit position for the specified cell
+        uint shift = (x * 3 + y) * 2;
+        // Create a bit mask (bit: 11) where only the bits for the specified cell are set (rest are 0)
+        uint256 mask = uint256(3) << shift;  
+        // Clear the given cell bits in board using mask and set new value (with the shit to get right position)
+        board = (board & ~mask) | (uint256(value) << shift);
+        games[gameId].board = board;
+    }
+
+    /// Method gets the value of cell on the board represented as a bit array
+    function getCell(uint256 board, uint8 x, uint8 y) pure internal returns (uint8) {
+        uint shift = (x * 3 + y) * 2;
+        // Right-shift board` by bit position get the cell value at rightmost bits & mask with "11" 
+        // to get the value 
+        return uint8((board >> shift) & 3);
     }
 }

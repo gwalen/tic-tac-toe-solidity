@@ -21,7 +21,7 @@ contract TicTacToeTest is Test {
         TicTacToe ticTacToe = new TicTacToe();
 
         vm.prank(ALICE);
-        uint256 gameId = ticTacToe.createGame(BOB);
+        uint256 gameId = ticTacToe.openGame(BOB);
 
         TicTacToe.GameState state = ticTacToe.getGameState(gameId);
         assertEq(uint(state), uint(TicTacToe.GameState.InviteSent));
@@ -32,7 +32,7 @@ contract TicTacToeTest is Test {
 
         vm.startPrank(ALICE);
         vm.expectRevert(abi.encodeWithSelector(TicTacToe.CanNotInviteYourself.selector));
-        ticTacToe.createGame(ALICE);
+        ticTacToe.openGame(ALICE);
         vm.stopPrank();
     }
 
@@ -42,7 +42,7 @@ contract TicTacToeTest is Test {
         vm.startPrank(ALICE);
         vm.expectEmit(false, false, false, true);
         emit TicTacToe.GameCreated(1, ALICE, BOB);
-        uint256 gameId = ticTacToe.createGame(BOB);
+        uint256 gameId = ticTacToe.openGame(BOB);
         vm.stopPrank();
 
         vm.startPrank(BOB);
@@ -92,21 +92,21 @@ contract TicTacToeTest is Test {
         TicTacToe ticTacToe = new TicTacToe();
 
         vm.prank(ALICE);
-        uint256 gameId1 = ticTacToe.createGame(BOB);
+        uint256 gameId1 = ticTacToe.openGame(BOB);
 
         vm.prank(ALICE);
-        uint256 gameId2 = ticTacToe.createGame(JOE);
+        uint256 gameId2 = ticTacToe.openGame(JOE);
 
         // second game opened with Bob
         vm.prank(ALICE);
-        uint256 gameId3 = ticTacToe.createGame(BOB);
+        uint256 gameId3 = ticTacToe.openGame(BOB);
 
         // bob also opened a game with Alice
         vm.prank(BOB);
-        uint256 gameId4 = ticTacToe.createGame(ALICE);
+        uint256 gameId4 = ticTacToe.openGame(ALICE);
 
         vm.prank(BOB);
-        uint256 gameId5 = ticTacToe.createGame(JIM);
+        uint256 gameId5 = ticTacToe.openGame(JIM);
 
         // start some games
 
@@ -228,7 +228,7 @@ contract TicTacToeTest is Test {
 
     function startGameAliceAndBob(TicTacToe game) internal returns(uint256) {
         vm.prank(ALICE);
-        uint256 gameId = game.createGame(BOB);
+        uint256 gameId = game.openGame(BOB);
 
         vm.prank(BOB);
         game.joinGame(gameId);
